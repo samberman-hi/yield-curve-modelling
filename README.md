@@ -2,7 +2,7 @@
 
 **Sam Berman, University College Dublin**
 
-**Headline result.** Across 32 walk-forward formation windows (5,455 within-industry pair tests on 53 US large caps and ETFs), the Engle–Granger test rejects "no cointegration" only slightly more often than chance (8.2% of directional tests at the 5% level, against 5% under the null). After a Benjamini–Hochberg correction just **7 pair-windows** survive in 16 years, and the pre-specified strategy sits in cash 93% of the time. That portfolio earns a Sharpe ratio of **0.09** with a static OLS hedge and **0.42** with a Kalman hedge, after costs. **Neither is statistically significant** (Newey–West p = 0.66 and 0.08). Skipping the correction gives 175 pair-windows and a tradable book, but it loses money: Sharpe **−0.19 (OLS)** and **−0.21 (Kalman)**. Half of its OLS trades end in a stop-loss. Out of sample, only **7%** of selected spreads still reject a unit root, and on an average day **20%** of them sit beyond the ±4σ stop level. Returns are uncorrelated with the S&P 500 (β ≈ −0.01 to −0.03, all insignificant). The honest conclusion: classic cointegration pairs trading on liquid US large caps showed no reliable edge over 2011–2026 once costs and data-snooping are accounted for.
+**Headline result.** Across 32 walk-forward formation windows (5,455 within-industry pair tests on 47 US large caps and 6 ETFs), the Engle–Granger test rejects "no cointegration" only slightly more often than chance (8.2% of directional tests at the 5% level, against 5% under the null). After a Benjamini–Hochberg correction just **7 pair-windows** survive in 16 years, and the pre-specified strategy has no open position on 93–95% of days. That portfolio earns a Sharpe ratio of **0.09** with a static OLS hedge and **0.42** with a Kalman hedge, after costs. **Neither is statistically significant** (Newey–West p = 0.66 and 0.08). Skipping the correction gives 175 pair-windows and a tradable book, but it loses money: Sharpe **−0.19 (OLS)** and **−0.21 (Kalman)**. Half of its OLS trades end in a stop-loss. Out of sample, only **7%** of selected spreads still reject a unit root, and selected spreads spend on average **20%** of their trading days beyond the level that formation statistics put at 4σ. Returns are uncorrelated with the S&P 500 (β ≈ −0.01 to −0.03, all insignificant). The honest conclusion: classic cointegration pairs trading on liquid US large caps showed no reliable edge over 2011–2026 once costs and data-snooping are accounted for.
 
 ![Cumulative returns](figures/fig1_cumulative_returns.png)
 
@@ -57,7 +57,7 @@ For every within-group pair, using log prices $y_t, x_t$:
 
 - **Engle–Granger.** Regress $y_t = \alpha + \beta x_t + u_t$ by OLS, then run an ADF test on $\hat u_t$ (lags chosen by AIC) using MacKinnon cointegration p-values. The test depends on which series is the regressand, so it is run **both ways** and the **larger** p-value is kept. A pair must reject in both directions, which removes the freedom to choose the favourable ordering.
 - **Benjamini–Hochberg** at FDR $q=5\%$ across *all* pairs tested in that window (153–174 tests). Sort the p-values $p_{(1)}\le\dots\le p_{(m)}$ and reject the $k^*$ smallest, where $k^*=\max\{k: p_{(k)}\le kq/m\}$.
-- **Johansen trace test** (constant in the cointegrating relation, one lagged difference) must also reject rank 0 at 5%. It is used as a confirmation filter only, because statsmodels gives critical values rather than p-values.
+- **Johansen trace test** (statsmodels `det_order = 0`, i.e. a constant term; one lagged difference) must also reject rank 0 at 5%. It is used as a confirmation filter only, because statsmodels gives critical values rather than p-values.
 - **Half-life** from an AR(1)/discrete Ornstein–Uhlenbeck fit to the spread $s_t$:
   $$\Delta s_t = a + b\,s_{t-1} + \varepsilon_t,\qquad \phi = 1+b,\qquad \text{HL} = \frac{\ln 2}{-\ln \phi}.$$
   The half-life must lie between 2 and 63 trading days (63 is half the trading window).
@@ -168,15 +168,14 @@ The second and fourth rows are more direct evidence. Out of sample the spreads a
 
 **What it costs.**
 
-- Pair-windows whose spread still rejects a unit root out of sample made **+5.3%** of pair capital on average (n = 13).
-- The rest lost **−0.7%** (n = 162).
-- With the OLS hedge, **50% of trades end in a stop-loss**. Summed over trades, the stopped-out trades lost 5.88 units of pair capital and all other trades made +5.37. In plain terms, the losses from spreads that do not come back more than wipe out the convergence profits.
+- With the OLS hedge, pair-windows whose spread still rejects a unit root out of sample made **+5.3%** of pair capital on average (n = 13). The rest lost **−0.7%** (n = 162). With the Kalman hedge both groups lose: −0.3% and −0.9%.
+- With the OLS hedge, **50% of trades end in a stop-loss** (uncorrected selection; 33% under BH). Summed over trades, the stopped-out trades lost 5.88 units of pair capital and all other trades made +5.37. In plain terms, the losses from spreads that do not come back more than wipe out the convergence profits.
 
 ![breakdown](figures/fig5_breakdown.png)
 
-**Kalman hides breakdowns from the stop-loss.** With the Kalman hedge only 10% of trades hit the stop, against 50% for OLS, but that is not good news.
+**Kalman hides breakdowns from the stop-loss.** Under the uncorrected selection, only 10% of Kalman trades hit the stop, against 50% for OLS (19% vs 33% under BH). That is not good news.
 
-- The Kalman model assumes white-noise errors while the spread is an AR(1) process, so the model is misspecified. Its prediction errors have a median lag-1 autocorrelation of 0.90, where a well-specified filter would be near 0.
+- The Kalman model assumes white-noise errors while the spread is an AR(1) process, so the model is misspecified. Its prediction errors have a median lag-1 autocorrelation of 0.90 (0.88 under BH), where a well-specified filter would be near 0.
 - When a relationship breaks, the drifting intercept and hedge ratio re-estimate the equilibrium toward the new prices. The z-score then drifts back to 0 and the trade closes as a "convergence" at a large loss.
 - The three worst Kalman trades lost 43%, 37% and 31% of pair capital (INTC/MU in 2024; TXN/MU and ADI/MU in Sep–Oct 2025, during MU's memory rally). All three closed on the exit rule, not the stop.
 
@@ -186,7 +185,7 @@ An adaptive hedge needs a stop based on P&L, not on z.
 
 ![grid](figures/fig4_sensitivity_grid.png)
 
-- Under the uncorrected selection, **all 16 OLS cells are negative**, even at zero cost. The Kalman hedge turns positive only at entry ≥ 2.5 with costs ≤ 10 bp, and peaks at 0.16. Costs steadily reduce the Sharpe ratio, by about 0.06 per extra 5 bp.
+- Under the uncorrected selection, **all 16 OLS cells are negative**, even at zero cost. The Kalman hedge turns positive only at entry ≥ 2.5 with costs ≤ 10 bp, and peaks at 0.16. Costs steadily reduce the Sharpe ratio: by about 0.06 per extra 5 bp in the uncorrected book, and 0.02–0.04 in the sparser BH book.
 - The best of the 64 cells is BH / Kalman / entry 3.0 / zero cost: Sharpe 0.60, p = 0.050 on **5 trades**. Its Bonferroni-adjusted p-value across 64 cells is 1.0. Reporting that cell as "the result" would be exactly the over-fitting the grid is meant to expose.
 - Robustness (`results/robustness.csv`): hedge-ratio weighting, dropping the Johansen filter, Kalman δ = 10⁻⁴ or 10⁻² and a same-close fill all leave every specification insignificant at 5%. The smallest p-value is 0.059, for BH/Kalman with hedge-ratio weighting, which again rests on 16 trades. Under BH, the Johansen filter never binds: all 7 BH pairs pass it.
 

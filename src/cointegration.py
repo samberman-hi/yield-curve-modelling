@@ -78,7 +78,7 @@ def engle_granger_pvalue(y: np.ndarray, x: np.ndarray) -> float:
 def johansen_trace_rejects(y: np.ndarray, x: np.ndarray, level: str = "5%") -> bool:
     """Johansen trace test of H0: rank = 0 (no cointegration) vs rank >= 1.
 
-    Constant in the cointegrating relation (det_order=0) and one lagged
+    A constant term (statsmodels det_order=0) and one lagged
     difference in the VECM. statsmodels reports critical values (90/95/99%)
     rather than p-values, so the Johansen test is used as a confirmation filter.
     """

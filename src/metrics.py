@@ -88,11 +88,36 @@ def summary(r: pd.Series, mkt: pd.Series, trades: pd.DataFrame,
         turnover=turnover(trades, windows, n_years),
         n_trades=int(len(trades)),
         hit_rate=float((trades["net"] > 0).mean()) if len(trades) else float("nan"),
-        avg_trade_net_bps=float(trades["net"].mean() / 2 * 1e4) if len(trades) else float("nan"),
+        # per $1 of pair capital (i.e. per $1 long + $1 short)
+        avg_trade_net_bps=float(trades["net"].mean() * 1e4) if len(trades) else float("nan"),
         avg_holding_days=float(trades["days"].mean()) if len(trades) else float("nan"),
     )
     out.update(market_exposure(r, mkt))
     return out
+
+
+def trade_level_tests(trades: pd.DataFrame) -> dict[str, float]:
+    """Inference that does not lean on thousands of zero-return days.
+
+    t-test and Wilcoxon signed-rank test on per-trade net P&L, a t-test on
+    per-window P&L (windows with at least one trade), and the share of total
+    net P&L contributed by the two best trades (concentration).
+    """
+    from scipy import stats
+
+    if len(trades) < 3:
+        return dict(trade_t_p=float("nan"), trade_wilcoxon_p=float("nan"),
+                    window_t_p=float("nan"), top2_share=float("nan"))
+    net = trades["net"].to_numpy()
+    by_window = trades.groupby("window_start")["net"].sum().to_numpy()
+    total = net.sum()
+    return dict(
+        trade_t_p=float(stats.ttest_1samp(net, 0.0).pvalue),
+        trade_wilcoxon_p=float(stats.wilcoxon(net).pvalue),
+        window_t_p=float(stats.ttest_1samp(by_window, 0.0).pvalue) if len(by_window) > 2 else float("nan"),
+        n_windows_traded=int(len(by_window)),
+        top2_share=float(np.sort(net)[-2:].sum() / total) if total != 0 else float("nan"),
+    )
 
 
 def difference_test(r1: pd.Series, r2: pd.Series) -> tuple[float, float, float]:

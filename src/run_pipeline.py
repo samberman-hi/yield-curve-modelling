@@ -20,13 +20,15 @@ from dataclasses import asdict
 
 import numpy as np
 import pandas as pd
+from statsmodels.stats.multitest import multipletests
 
 from . import plots
 from .backtest import STOP, BacktestResult, precompute_tests, run_backtest
 from .config import (BASELINE, BENCHMARK, END, FIGURES_DIR, GRID_COST_BPS, GRID_ENTRY_Z,
                      RESULTS_DIR, START, StrategyConfig)
-from .data import data_sources, large_moves, load_prices
-from .metrics import TRADING_DAYS, difference_test, hac_mean_test, summary
+from .data import data_sources, large_moves, load_prices, risk_free_daily
+from .metrics import (TRADING_DAYS, difference_test, hac_mean_test, max_drawdown, sharpe,
+                      summary, trade_level_tests)
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +39,8 @@ SPECS: dict[str, StrategyConfig] = {
 HEDGES = ("ols", "kalman")
 
 # Worked example: a BH-selected pair whose window shows all three outcomes
-# (a convergence exit, a large win and a stop-loss). Chosen for teaching value.
+# (a convergence exit, a large win and a stop-loss). Chosen for teaching value
+# after the results were seen, so it is an illustration, not evidence.
 WORKED_EXAMPLE = ("C", "PNC", "2020-01-08")
 
 
@@ -57,23 +60,29 @@ def selection_table(tests: dict[int, pd.DataFrame], runs: dict[str, BacktestResu
     w = w.rename(columns={"n_selected": "n_selected_bh"})
     w["n_dir_sig_yx"] = [int((t["eg_p_yx"] < 0.05).sum()) for t in tests.values()]
     w["n_johansen"] = [int(t["johansen"].sum()) for t in tests.values()]
+    # Benjamini-Yekutieli: valid under arbitrary dependence (pairs share legs)
+    w["n_by_sig"] = [int(multipletests(t["eg_pvalue"], alpha=0.05, method="fdr_by")[0].sum())
+                     for t in tests.values()]
     return w
 
 
-def performance_table(runs: dict[str, BacktestResult], mkt: pd.Series) -> pd.DataFrame:
+def performance_table(runs: dict[str, BacktestResult], mkt: pd.Series,
+                      rf: pd.Series) -> pd.DataFrame:
     rows = {}
     for name, r in runs.items():
         s = summary(r.returns, mkt, r.trades, r.windows)
         s["n_pair_windows"] = len(r.pairs)
         s["time_in_market"] = float((r.n_open > 0).mean())
+        s.update(trade_level_tests(r.trades))
         rows[name] = s
-    m = mkt.loc[next(iter(runs.values())).returns.index]
-    t, p = hac_mean_test(m)
-    rows["S&P 500 (SPY, total return)"] = dict(
+    idx = next(iter(runs.values())).returns.index
+    m = mkt.loc[idx]
+    mx = m - rf.loc[idx]  # SPY excess return, comparable with the self-financing book
+    t, p = hac_mean_test(mx)
+    rows["S&P 500 (SPY)"] = dict(
         ann_return=float((1 + m).prod() ** (TRADING_DAYS / len(m)) - 1),
         ann_vol=float(m.std() * np.sqrt(TRADING_DAYS)),
-        sharpe=float(np.sqrt(TRADING_DAYS) * m.mean() / m.std()), t_stat=t, p_value=p,
-        max_drawdown=float(((1 + m).cumprod() / (1 + m).cumprod().cummax() - 1).min()))
+        sharpe=sharpe(mx), t_stat=t, p_value=p, max_drawdown=max_drawdown(m))
     return pd.DataFrame(rows).T
 
 
@@ -95,13 +104,17 @@ def breakdown_table(runs: dict[str, BacktestResult]) -> pd.DataFrame:
             if pr.empty:
                 continue
             stops = tr[tr["reason"] == STOP] if not tr.empty else tr
+            rej = pr["oos_adf_reject"]
             rows.append(dict(
                 spec=spec, hedge=hedge, pair_windows=len(pr),
-                pct_broken_oos=pr["oos_broken"].mean(),
-                pct_broken_is_benchmark=pr["is_broken"].mean(),
-                mean_pnl_held=pr.loc[~pr["oos_broken"], "net_pnl"].mean(),
-                mean_pnl_broken=pr.loc[pr["oos_broken"], "net_pnl"].mean(),
-                n_held=int((~pr["oos_broken"]).sum()), n_broken=int(pr["oos_broken"].sum()),
+                pct_oos_adf_reject=rej.mean(),
+                median_oos_z_sd=pr["oos_z_sd"].median(),
+                pct_pairs_oos_z_sd_above_2=(pr["oos_z_sd"] > 2).mean(),
+                mean_frac_days_beyond_stop=pr["oos_frac_beyond_stop"].mean(),
+                median_signal_z_ac1=pr["signal_z_ac1"].median(),
+                mean_pnl_adf_reject=pr.loc[rej, "net_pnl"].mean(),
+                mean_pnl_adf_no_reject=pr.loc[~rej, "net_pnl"].mean(),
+                n_adf_reject=int(rej.sum()), n_adf_no_reject=int((~rej).sum()),
                 n_trades=len(tr), n_stops=len(stops),
                 stop_rate=len(stops) / len(tr) if len(tr) else np.nan,
                 stop_pnl_total=stops["net"].sum() if len(stops) else 0.0,
@@ -144,9 +157,6 @@ def run_robustness(prices: pd.DataFrame, tests: dict[int, pd.DataFrame], mkt: pd
                 if "Kalman" in name and hedge != "kalman":
                     continue
                 c = cfg.with_(hedge=hedge, **kw)
-                if c.execution_lag == 0:
-                    # with no lag the position is filled on the signal close itself
-                    c = c.with_(execution_lag=0)
                 r = run_backtest(prices, c, tests)
                 s = summary(r.returns, mkt, r.trades, r.windows)
                 rows.append(dict(spec=spec, hedge=hedge, variant=name, sharpe=s["sharpe"],
@@ -183,7 +193,7 @@ def worked_example(prices: pd.DataFrame, tests: dict[int, pd.DataFrame],
                 spread_std=float(tested["spread_std"]),
                 eg_p_yx=float(tested["eg_p_yx"]), eg_p_xy=float(tested["eg_p_xy"]),
                 johansen=bool(tested["johansen"]), half_life=float(tested["half_life"]),
-                oos_adf_p=float(pair["oos_adf_p"]), is_adf_p=float(pair["is_adf_p"]),
+                oos_adf_p=float(pair["oos_adf_p"]), oos_z_sd=float(pair["oos_z_sd"]),
                 net_pnl_ols=float(po.pnl.sum()), net_pnl_kalman=float(pk.pnl.sum()),
                 n_pairs_in_window=int(ols.windows.set_index("window_start").loc[s, "n_selected"]))
 
@@ -198,6 +208,7 @@ def main() -> dict:
     log.info("prices %s, %s to %s", prices.shape, prices.index[0].date(), prices.index[-1].date())
     large_moves(prices).to_csv(RESULTS_DIR / "data_quality_large_moves.csv", index=False)
     mkt = prices[BENCHMARK].pct_change()
+    rf = risk_free_daily(prices.index)
 
     tests = precompute_tests(prices, BASELINE)
     all_tests = pd.concat([t.assign(window_start=s) for s, t in tests.items()], ignore_index=True)
@@ -215,7 +226,7 @@ def main() -> dict:
     daily.to_csv(RESULTS_DIR / "daily_returns.csv")
 
     sel = selection_table(tests, runs)
-    perf = performance_table(runs, mkt)
+    perf = performance_table(runs, mkt, rf)
     kvo = kalman_vs_ols(runs)
     brk = breakdown_table(runs)
     sel.to_csv(RESULTS_DIR / "selection_by_window.csv", index=False)
@@ -237,7 +248,7 @@ def main() -> dict:
     plots.selection_per_window(sel, FIGURES_DIR / "fig3_pairs_per_window.png")
     plots.sensitivity_grid(grid, FIGURES_DIR / "fig4_sensitivity_grid.png")
     unc = runs[label("Uncorrected", "ols")].pairs
-    plots.breakdown(unc, FIGURES_DIR / "fig5_breakdown.png",
+    plots.breakdown(unc, BASELINE.stop_z, FIGURES_DIR / "fig5_breakdown.png",
                     f"Uncorrected selection, static OLS hedge: {len(unc)} pair-windows")
     example = worked_example(prices, tests, runs)
 
@@ -259,6 +270,7 @@ def main() -> dict:
             max_p_reject_rate_5pct=float((all_tests["eg_pvalue"] < 0.05).mean()),
             johansen_reject_rate_5pct=float(all_tests["johansen"].mean()),
             n_bh_significant=int(sel["n_bh_sig"].sum()),
+            n_by_significant=int(sel["n_by_sig"].sum()),
             n_selected_bh=int(sel["n_selected_bh"].sum()),
             n_selected_uncorrected=int(sel["n_selected_uncorrected"].sum()),
             windows_with_no_bh_pair=int((sel["n_selected_bh"] == 0).sum())),

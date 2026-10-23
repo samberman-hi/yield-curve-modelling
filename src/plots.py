@@ -127,30 +127,30 @@ def sensitivity_grid(grid: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def breakdown(pairs: pd.DataFrame, path: Path, subtitle: str = "") -> None:
-    """Out-of-sample vs in-sample ADF p-values of the formation spread."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-    bins = np.linspace(0, 1, 21)
-    ax1.hist(pairs["is_adf_p"], bins=bins, color=BLUE, alpha=0.85, edgecolor=SURFACE,
-             label="Last 126 days of formation window")
-    ax1.hist(pairs["oos_adf_p"], bins=bins, color=ORANGE, alpha=0.65, edgecolor=SURFACE,
-             label="126-day trading window (out of sample)")
-    ax1.axvline(0.05, color=INK2, linestyle="--", linewidth=1.2)
-    ax1.set_xlabel("ADF p-value of spread (formation hedge ratio)")
+def breakdown(pairs: pd.DataFrame, stop: float, path: Path, subtitle: str = "") -> None:
+    """Out-of-sample behaviour of the formation spread, and what it cost."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.2))
+    sd = pairs["oos_z_sd"].clip(upper=8)
+    ax1.hist(sd, bins=np.linspace(0, 8, 33), color=ORANGE, edgecolor=SURFACE, linewidth=1.2)
+    ax1.axvline(1, color=INK, linestyle="--", linewidth=1.2)
+    ax1.text(1.1, ax1.get_ylim()[1] * 0.95, "sd = 1 in formation\n(by construction)",
+             va="top", fontsize=8, color=INK)
+    ax1.set_xlabel("Out-of-sample sd of the spread z-score (formation units, capped at 8)")
     ax1.set_ylabel("Pair-windows")
-    ax1.set_title("Does the spread stay stationary?")
-    ax1.legend(loc="upper right")
+    ax1.set_title(f"Spreads are wider out of sample (median sd {pairs['oos_z_sd'].median():.1f})")
 
-    g = pairs.assign(status=np.where(pairs["oos_broken"], "Broke OOS\n(ADF p >= 0.05)",
-                                     "Held OOS\n(ADF p < 0.05)"))
+    g = pairs.assign(status=np.where(pairs["oos_adf_reject"],
+                                     "ADF rejects unit root\nOOS (p < 0.05)",
+                                     "ADF fails to reject\nOOS (p >= 0.05)"))
     stats = g.groupby("status")["net_pnl"].agg(["mean", "count"])
-    ax2.bar(stats.index, stats["mean"] * 100, color=[ORANGE, BLUE][: len(stats)], width=0.5)
+    colors = [BLUE if "rejects" in k else ORANGE for k in stats.index]
+    ax2.bar(stats.index, stats["mean"] * 100, color=colors, width=0.5)
     for i, (m, n) in enumerate(zip(stats["mean"], stats["count"])):
         ax2.text(i, m * 100, f"{m * 100:+.2f}%\n(n = {n})", ha="center",
                  va="bottom" if m >= 0 else "top", fontsize=8, color=INK)
     ax2.axhline(0, color=AXIS, linewidth=0.8)
     ax2.set_ylabel("Mean net P&L per pair-window (% of pair capital)")
-    ax2.set_title("What a breakdown costs")
+    ax2.set_title("P&L by out-of-sample stationarity")
     ax2.margins(y=0.25)
     if subtitle:
         fig.suptitle(subtitle, fontsize=10, color=INK2)

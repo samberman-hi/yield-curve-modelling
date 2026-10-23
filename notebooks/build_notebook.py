@@ -77,19 +77,19 @@ which is why it is used only as a confirmation filter."""),
 cols = ["ann_return", "ann_vol", "sharpe", "t_stat", "p_value", "max_drawdown", "turnover",
         "n_trades", "hit_rate", "avg_holding_days", "time_in_market", "beta", "beta_p", "corr",
         "alpha_ann", "alpha_p"]
-perf[cols].T"""),
+perf[cols + ["trade_t_p", "trade_wilcoxon_p", "window_t_p", "top2_share"]].T"""),
     ("code", 'display(Image(FIGURES_DIR / "fig1_cumulative_returns.png"))'),
     ("code", """# Kalman minus OLS: mean daily return difference, Newey-West t-test
 pd.read_csv(RESULTS_DIR / "kalman_vs_ols.csv")"""),
     ("md", "## 4. Does cointegration survive out of sample, and what does a breakdown cost?"),
     ("code", 'pd.read_csv(RESULTS_DIR / "breakdown.csv").set_index(["spec", "hedge"]).T'),
     ("code", 'display(Image(FIGURES_DIR / "fig5_breakdown.png"))'),
-    ("md", """The ADF test on a 126-day trading window has low power, so "fails to reject"
-is not proof of a break. The benchmark row `pct_broken_is_benchmark` applies
-the *same* test with the *same* coefficients to the last 126 days of the
-formation window, where the pair is known to look cointegrated. The gap
-between the two rows is the out-of-sample breakdown that low power cannot
-explain."""),
+    ("md", """Two diagnostics of the *formation* spread out of sample:
+
+- **`pct_oos_adf_reject`** is the share of pair-windows where the ADF test still rejects a unit root. The test has low power on 126 days, and selection biases formation half-lives downward, so failing to reject is not proof of a break.
+- **`median_oos_z_sd`** and **`mean_frac_days_beyond_stop`** measure how wide the spread became in formation units, where the sd is 1 by construction.
+
+`median_signal_z_ac1` shows the Kalman prediction errors are strongly autocorrelated (about 0.9): the filter is misspecified for an AR(1) spread."""),
     ("code", """t = pd.read_csv(RESULTS_DIR / "trades_uncorrected_kalman.csv")
 print("Worst Kalman trades (uncorrected selection): large losses closed by the mean-crossing exit, not the stop")
 t.nsmallest(5, "net")[["group", "y", "x", "entry_date", "exit_date", "reason", "net", "days"]]"""),
@@ -126,8 +126,8 @@ trades[["hedge", "entry_date", "exit_date", "direction", "entry_z", "exit_z", "r
 1. *Formation (Jan 2019 - Jan 2020):* log C = -0.19 + 0.90 log PNC; EG p < 0.0001 in both directions, Johansen rejects, half-life 3.8 days. It is the only pair to pass BH in this window.
 2. *14 Jan 2020:* z = +2.07 (C rich vs PNC), so short the spread: short $1 of C, long $1 of PNC, filled at the 15 Jan close. The spread converges; the exit signal fills on 25 Feb: **+6.2%** net.
 3. *6 Mar:* z = +2.65, so short again, filled Monday 9 Mar. The COVID sell-off then drives the spread straight through its mean to z = -6.6 by 12 Mar: **+11.5%**. This is luck, not the thesis: the spread overshot by six standard deviations.
-4. *13 Mar:* z = -3.70 (inside the [-4, -2] band), so buy the spread, filled 16 Mar at z = -6.8. It keeps diverging (z = -10.9), and the stop fills on 17 Mar: **-9.2%**.
-5. The Kalman hedge ratio drifts from 0.90 to 1.5 during the crisis: the "equilibrium" was not stable. Net for the window: **+8.5%** of pair capital (OLS) and **+7.5%** (Kalman), most of it from one overshoot. The out-of-sample ADF p-value is 0.53, so by our measure this pair "broke", yet it made money. Breakdown and losses are not the same thing."""),
+4. *13 Mar:* z = -3.70 (inside the [-4, -2] band), so buy the spread. It fills on Monday 16 Mar at z = -6.7, already beyond the stop, and the stop fills on 17 Mar at z = -10.9: **-9.2%**.
+5. The Kalman hedge ratio drifts from 0.90 to 1.5 during the crisis: the "equilibrium" was not stable. Net for the window: **+8.5%** of pair capital (OLS) and **+7.5%** (Kalman), most of it from one overshoot. Out of sample the spread had an sd of 4.6 formation units (ADF p = 0.53), yet the pair made money. This example was chosen after seeing the results, as an illustration."""),
 ]
 
 nb = nbf.v4.new_notebook()

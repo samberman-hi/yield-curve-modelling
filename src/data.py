@@ -85,6 +85,28 @@ def download_ticker(ticker: str, start: str = START, end: str = END,
     return None
 
 
+def load_fred(series_id: str, raw_dir: Path = RAW_DIR, refresh: bool = False) -> pd.Series:
+    """Download a FRED series via the public CSV endpoint (no API key), cached."""
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    path = raw_dir / f"FRED_{series_id}.csv"
+    if not path.exists() or refresh:
+        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        path.write_text(r.text)
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
+    # FRED marks missing days with "." -> NaN
+    return pd.to_numeric(df.iloc[:, 0], errors="coerce").rename(series_id)
+
+
+def risk_free_daily(index: pd.DatetimeIndex, raw_dir: Path = RAW_DIR) -> pd.Series:
+    """Daily risk-free rate from the 3-month T-bill (FRED DTB3, % p.a.),
+    forward-filled onto the trading calendar and divided by 252. Only used to
+    turn SPY's total return into an excess return for a like-for-like Sharpe."""
+    rf = load_fred("DTB3", raw_dir).reindex(index, method="ffill")
+    return (rf / 100 / 252).rename("rf")
+
+
 def all_tickers() -> list[str]:
     tickers = [t for group in UNIVERSE.values() for t in group]
     return sorted(set(tickers + [BENCHMARK]))

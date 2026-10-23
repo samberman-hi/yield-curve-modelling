@@ -2,7 +2,7 @@
 
 **Sam Berman, University College Dublin**
 
-**Headline result.** Across 32 walk-forward formation windows (5,455 within-industry pair tests on 53 US large caps and ETFs), the Engle–Granger test rejects "no cointegration" only slightly more often than chance (8.2% of directional tests at the 5% level, against 5% under the null). After a Benjamini–Hochberg correction just **7 pair-windows** survive in 16 years, and the pre-specified strategy sits in cash 93% of the time. That portfolio earns a Sharpe ratio of **0.09** with a static OLS hedge and **0.42** with a Kalman hedge, after costs. **Neither is statistically significant** (Newey–West p = 0.66 and 0.08). Skipping the correction gives 175 pair-windows and a tradable book, but it loses money: Sharpe **−0.19 (OLS)** and **−0.21 (Kalman)**. In that book **93%** of selected pairs fail an out-of-sample ADF test, against 58% for the same test on the end of the formation window. Returns are uncorrelated with the S&P 500 (β ≈ −0.01 to −0.03, all insignificant). The honest conclusion: classic cointegration pairs trading on liquid US large caps showed no reliable edge over 2011–2026 once costs and data-snooping are accounted for.
+**Headline result.** Across 32 walk-forward formation windows (5,455 within-industry pair tests on 53 US large caps and ETFs), the Engle–Granger test rejects "no cointegration" only slightly more often than chance (8.2% of directional tests at the 5% level, against 5% under the null). After a Benjamini–Hochberg correction just **7 pair-windows** survive in 16 years, and the pre-specified strategy sits in cash 93% of the time. That portfolio earns a Sharpe ratio of **0.09** with a static OLS hedge and **0.42** with a Kalman hedge, after costs. **Neither is statistically significant** (Newey–West p = 0.66 and 0.08). Skipping the correction gives 175 pair-windows and a tradable book, but it loses money: Sharpe **−0.19 (OLS)** and **−0.21 (Kalman)**. Half of its OLS trades end in a stop-loss. Out of sample, only **7%** of selected spreads still reject a unit root, and on an average day **20%** of them sit beyond the ±4σ stop level. Returns are uncorrelated with the S&P 500 (β ≈ −0.01 to −0.03, all insignificant). The honest conclusion: classic cointegration pairs trading on liquid US large caps showed no reliable edge over 2011–2026 once costs and data-snooping are accounted for.
 
 ![Cumulative returns](figures/fig1_cumulative_returns.png)
 
@@ -20,9 +20,9 @@ Can a textbook statistical-arbitrage strategy make money out of sample after rea
 
 | Item | Choice |
 |---|---|
-| Source | Yahoo Finance daily **adjusted** closes (splits and dividends) via `yfinance` 1.7.0, cached to `data/raw/` (gitignored). Stooq was coded as a fallback but was not needed (it was also unreachable from the build environment). FRED was not needed: returns are self-financing excess returns. Every series is real downloaded data; nothing is simulated. |
+| Source | Yahoo Finance daily **adjusted** closes (splits and dividends) via `yfinance` 1.7.0, cached to `data/raw/` (gitignored). Stooq was coded as a fallback but was not needed (it was also unreachable from the build environment). The 3-month T-bill rate (FRED `DTB3`, public CSV endpoint) is used only to compute SPY's excess return; the pairs book is self-financing, so its returns are already excess returns. Every series is real downloaded data; nothing is simulated. |
 | Sample | 4 Jan 2010 – 22 Oct 2026 (4,227 trading days). The first formation window is 2010; trading runs 3 Jan 2011 – 22 Oct 2026 (15.8 years). |
-| Benchmark | SPY (S&P 500 total-return proxy) |
+| Benchmark | SPY (S&P 500 total-return proxy); risk-free rate from FRED `DTB3` |
 | Data checks | Daily log moves above 25% are listed in `results/data_quality_large_moves.csv`. All match known events (the March 2020 crash, earnings, the Modelo deal). The COP/PSX spin-off is correctly adjusted. MPC, PSX and PYPL enter the universe only once they have a full formation window of history. |
 
 **Universe (pairs are formed only within a group):**
@@ -108,6 +108,7 @@ The **uncorrected** specification (raw p < 0.05) was planned as a comparison. It
 | Pairs rejecting in both directions (raw p < 0.05) | 4.7% |
 | Johansen trace rejects at 5% | 12.2% (over-rejects in short samples) |
 | Significant after Benjamini–Hochberg | **7** (in 6 of 32 windows; 26 windows have none) |
+| Significant after Benjamini–Yekutieli (valid under any dependence) | 4 |
 | Selected, uncorrected specification | 175 |
 
 ![p-values](figures/fig2_pvalue_histogram.png)
@@ -121,38 +122,65 @@ There is a mild excess of small p-values, so *some* pairs are cointegrated in so
 |---|---|---|---|---|---|
 | Annual return | 0.4% | 2.0% | −2.0% | −2.1% | 14.1% |
 | Annual volatility | 6.3% | 5.0% | 8.6% | 8.4% | 17.0% |
-| **Sharpe ratio** | **0.09** | **0.42** | **−0.19** | **−0.21** | 0.86 |
-| t-stat (Newey–West) | 0.44 | 1.78 | −0.80 | −0.96 | 3.89 |
+| **Sharpe ratio** (excess return) | **0.09** | **0.42** | **−0.19** | **−0.21** | 0.75 |
+| t-stat (Newey–West) | 0.44 | 1.78 | −0.80 | −0.96 | 3.37 |
 | p-value | 0.66 | 0.08 | 0.43 | 0.34 | <0.001 |
 | Max drawdown | −20.8% | −12.1% | −38.3% | −39.1% | −33.7% |
 | Turnover (× capital per year) | 2.5 | 3.8 | 10.3 | 12.3 | – |
 | Round-trip trades | 12 | 16 | 225 | 242 | – |
 | Hit rate (net P&L > 0) | 50% | 88% | 49% | 55% | – |
+| Avg. net P&L per trade (bp of pair capital) | +92 | +215 | −22 | −58 | – |
 | Avg. holding period (days) | 23 | 11 | 33 | 20 | – |
 | Time with ≥1 open position | 7% | 5% | 76% | 64% | – |
 | Beta to S&P 500 (p) | −0.03 (0.25) | −0.03 (0.23) | −0.01 (0.36) | −0.01 (0.25) | – |
 | Correlation with S&P 500 | −0.07 | −0.10 | −0.02 | −0.02 | – |
+| *Trade-level checks:* t-test p (per trade) | 0.70 | 0.20 | 0.69 | 0.18 | – |
+| Wilcoxon p (per trade) | 0.79 | 0.03 | 0.17 | 0.61 | – |
+| t-test p (per window, windows traded) | 0.44 (6) | 0.17 (6) | 0.66 (31) | 0.16 (32) | – |
 
-**Kalman vs OLS** (mean daily return difference, Newey–West): +1.5% a year under BH (t = 1.46, p = 0.14), and −0.1% a year uncorrected (t = −0.05, p = 0.96). **There is no significant difference.** The BH/Kalman result (Sharpe 0.42, alpha p = 0.049 against SPY) rests on 16 trades in 7 pair-windows. Its mean-return test gives p = 0.08, and it is the best of four specifications, so I do not treat it as evidence of an edge.
+Notes on the table:
+
+- **SPY's Sharpe ratio** is computed on its return in excess of the 3-month T-bill (FRED `DTB3`), so it is comparable with the self-financing pairs book.
+- **Kalman vs OLS** (mean daily return difference, Newey–West): +1.5% a year under BH (t = 1.46, p = 0.14), and −0.1% a year uncorrected (t = −0.05, p = 0.96). **There is no significant difference.**
+- **Under dollar-neutral sizing the hedge ratio only drives the signal**, not the positions. This comparison is therefore really "static vs adaptive *signal*". The hedge-ratio-weighted variant in Section 4.4 compares actual hedges and reaches the same conclusion.
+- **The BH/Kalman result is the closest thing to a positive finding, and it is fragile.** It has a Sharpe of 0.42 and an alpha against SPY with p = 0.049, but:
+  - it rests on 16 trades in 6 windows;
+  - its two best trades (EOG/VLO, Jan 2021: +18%; C/PNC, Mar 2020: +12%) provide **88%** of net P&L;
+  - per-trade and per-window t-tests give p = 0.20 and 0.17;
+  - it is the best of four headline specifications.
+
+  I do not treat it as evidence of an edge.
 
 ### 4.3 Out-of-sample breakdown of cointegration
 
-The breakdown test is an ADF test on the trading-window spread, using the **formation** α and β. Because the coefficients are not re-estimated, ordinary ADF critical values apply. An ADF on 126 days has low power, so the same test on the **last 126 days of the formation window** serves as a power benchmark.
+The z-score here is the formation spread $y_t-\hat\alpha-\hat\beta x_t$ in formation units. By construction its standard deviation is 1 inside the formation window. Two out-of-sample diagnostics, on the uncorrected selection (175 pair-windows):
 
-| Uncorrected selection, 175 pair-windows | Formation (benchmark) | Trading window (OOS) |
+| Out-of-sample diagnostic | Value | If the formation relationship held |
 |---|---|---|
-| Spread still rejected as non-stationary at 5% | 41.7% | **7.4%** |
-| "Broke" (fails to reject) | 58.3% | **92.6%** |
+| ADF on trading-window spread (formation α, β) rejects a unit root at 5% | **7.4%** of pair-windows | well above 5%, but power on 126 days is limited |
+| Median sd of the spread z-score | **1.47** | ≈ 1 |
+| Pair-windows with sd above 2 | 26% | ≈ 0 |
+| Average share of days with \|z\| ≥ 4 (the stop level) | **19.5%** | < 0.01% under N(0,1) |
 
-Breakdown is costly:
+**How to read the ADF row.** Because α and β come from the formation window and are not re-estimated, ordinary ADF critical values apply. But a 126-day ADF test has low power, and selecting pairs because they *looked* most mean-reverting in formation biases their apparent half-lives downward. A high fail-to-reject rate is therefore expected even for a relationship that did not change, so I do **not** read the 92.6% fail-to-reject rate as "93% of pairs broke".
 
-- Pairs that **held** out of sample made **+5.3%** of pair capital per window on average (n = 13).
-- Pairs that **broke** lost **−0.7%** (n = 162).
-- With the OLS hedge, **50% of trades end in a stop-loss**. Summed over trades, the stopped-out trades lost 5.88 units of pair capital and all other trades made +5.37. In plain terms, breakdowns more than wipe out the convergence profits.
+The second and fourth rows are more direct evidence. Out of sample the spreads are wider, and they drift: one day in five sits beyond the level that formation statistics said was a 4σ event. Selection bias and estimation error in β explain part of this, but a quarter of pairs show spreads more than twice as volatile as in formation.
+
+**What it costs.**
+
+- Pair-windows whose spread still rejects a unit root out of sample made **+5.3%** of pair capital on average (n = 13).
+- The rest lost **−0.7%** (n = 162).
+- With the OLS hedge, **50% of trades end in a stop-loss**. Summed over trades, the stopped-out trades lost 5.88 units of pair capital and all other trades made +5.37. In plain terms, the losses from spreads that do not come back more than wipe out the convergence profits.
 
 ![breakdown](figures/fig5_breakdown.png)
 
-**Kalman hides breakdowns from the stop-loss.** With the Kalman hedge only 10% of trades hit the stop, against 50% for OLS, but that is not good news. When a relationship breaks, the filter re-estimates the equilibrium toward the new prices, so the z-score drifts back to 0 and the trade closes as a "convergence" at a large loss. The three worst Kalman trades lost 43%, 37% and 31% of pair capital (INTC/MU in 2024; TXN/MU and ADI/MU in Sep–Oct 2025, during MU's memory rally), and all three closed on the exit rule, not the stop. An adaptive hedge needs a stop based on P&L, not on z.
+**Kalman hides breakdowns from the stop-loss.** With the Kalman hedge only 10% of trades hit the stop, against 50% for OLS, but that is not good news.
+
+- The Kalman model assumes white-noise errors while the spread is an AR(1) process, so the model is misspecified. Its prediction errors have a median lag-1 autocorrelation of 0.90, where a well-specified filter would be near 0.
+- When a relationship breaks, the drifting intercept and hedge ratio re-estimate the equilibrium toward the new prices. The z-score then drifts back to 0 and the trade closes as a "convergence" at a large loss.
+- The three worst Kalman trades lost 43%, 37% and 31% of pair capital (INTC/MU in 2024; TXN/MU and ADI/MU in Sep–Oct 2025, during MU's memory rally). All three closed on the exit rule, not the stop.
+
+An adaptive hedge needs a stop based on P&L, not on z.
 
 ### 4.4 Sensitivity grid (reported, not optimised)
 
@@ -160,7 +188,7 @@ Breakdown is costly:
 
 - Under the uncorrected selection, **all 16 OLS cells are negative**, even at zero cost. The Kalman hedge turns positive only at entry ≥ 2.5 with costs ≤ 10 bp, and peaks at 0.16. Costs steadily reduce the Sharpe ratio, by about 0.06 per extra 5 bp.
 - The best of the 64 cells is BH / Kalman / entry 3.0 / zero cost: Sharpe 0.60, p = 0.050 on **5 trades**. Its Bonferroni-adjusted p-value across 64 cells is 1.0. Reporting that cell as "the result" would be exactly the over-fitting the grid is meant to expose.
-- Robustness (`results/robustness.csv`): hedge-ratio weighting, dropping the Johansen filter, Kalman δ = 10⁻⁴ or 10⁻² and a same-close fill all leave every specification insignificant at 5%. The smallest p-value is 0.059, for BH/Kalman with hedge-ratio weighting, which again rests on 16 trades.
+- Robustness (`results/robustness.csv`): hedge-ratio weighting, dropping the Johansen filter, Kalman δ = 10⁻⁴ or 10⁻² and a same-close fill all leave every specification insignificant at 5%. The smallest p-value is 0.059, for BH/Kalman with hedge-ratio weighting, which again rests on 16 trades. Under BH, the Johansen filter never binds: all 7 BH pairs pass it.
 
 ### 4.5 Worked example: C vs PNC (BH-selected), January–July 2020
 
@@ -169,8 +197,12 @@ Breakdown is costly:
 1. **Formation (Jan 2019 – Jan 2020).** log C = −0.19 + 0.90 log PNC. EG p < 0.0001 in both directions, Johansen rejects, half-life 3.8 days. It is the only pair to pass BH in that window.
 2. **14 Jan 2020:** z = +2.07, meaning C is rich relative to PNC. The rule shorts $1 of C and buys $1 of PNC, filled at the 15 Jan close. The spread converges and the trade exits on 25 Feb for **+6.2%** net.
 3. **6 Mar:** z = +2.65, so the rule shorts again, filled 9 Mar. The COVID sell-off drives the spread straight through its mean to z = −6.6, and the trade closes on 12 Mar for **+11.5%**. That gain is luck, not mean reversion: the spread overshot by six standard deviations.
-4. **13 Mar:** z = −3.70, so the rule buys the spread, filled 16 Mar at z = −6.8. The spread keeps diverging to z = −10.9, and the stop-loss fills on 17 Mar for **−9.2%**.
-5. **Net:** +8.5% of pair capital (OLS) and +7.5% (Kalman). The Kalman hedge ratio moved from 0.90 to 1.5 during the crisis. The out-of-sample ADF p-value is 0.53, so the pair "broke" but still made money. Breakdown and losses are related, not identical.
+4. **13 Mar:** z = −3.70, so the rule buys the spread, filled Monday 16 Mar at z = −6.7. That same day z reaches its stop level, and the stop fills on 17 Mar at z = −10.9 for **−9.2%**.
+5. **Net:** +8.5% of pair capital (OLS) and +7.5% (Kalman).
+   - The Kalman hedge ratio moved from 0.90 to 1.5 during the crisis.
+   - The out-of-sample spread had an sd of 4.6 formation units and an ADF p-value of 0.53, yet the pair made money.
+   - The one-day execution lag cuts both ways: the signal fired at z = −3.7 but the fill came three standard deviations lower, at −6.7.
+   - This pair was chosen *after* seeing the results because it shows every rule firing. It is an illustration, not evidence.
 
 Every number above is recomputed by hand from raw prices in `notebooks/analysis.ipynb`, section 6.
 
@@ -178,12 +210,13 @@ Every number above is recomputed by hand from raw prices in `notebooks/analysis.
 
 - **Survivorship bias** in the universe (Section 2) probably flatters the results.
 - **Low power.** One-year formation windows give EG tests limited power. Longer windows, for example 3 years, would detect more true relationships but would assume relationships stay stable for longer. This trade-off was not explored, to avoid another parameter search.
-- **Dependent tests.** BH assumes independent or positively dependent tests, but pairs that share a stock are dependent. Benjamini–Yekutieli would be stricter still and would leave even fewer pairs, so the conclusion stands.
+- **Dependent tests.** BH assumes independent or positively dependent tests, but pairs that share a stock are dependent. Benjamini–Yekutieli, which allows for any dependence, keeps 4 pair-windows instead of 7, so the conclusion stands. FDR is controlled within each window, not across all 32.
 - **Small samples.** With only 7 BH pair-windows, the BH results have very wide confidence intervals. A Sharpe of 0.42 over 15.8 years has a standard error of roughly 0.25.
 - **Costs are assumptions.** The 5 bp per leg per side figure is a reasonable 2011–2026 estimate for large caps, but costs were higher early in the sample and around events. Borrow fees are a flat 50 bp, with no hard-to-borrow episodes and no recalls.
 - **Execution.** Fills are at the close with a one-day lag. There is no intraday modelling and no market impact beyond the slippage figure.
 - **Dollar neutrality vs the hedge ratio.** Dollar-neutral legs do not replicate the cointegrating spread when β ≠ 1. The hedge-ratio-weighted variant is in the robustness table and does not change the conclusion.
-- **Kalman δ is a modelling choice.** The z-score is the one-step prediction error, which adapts toward the data. Section 4.3 shows the downside.
+- **The Kalman model is misspecified** (it assumes i.i.d. errors for an AR(1) spread), and δ is a modelling choice. Its z-score is a scaled prediction error, not an N(0,1) variable. Section 4.3 shows the downside.
+- **Selection hindsight.** EWA/EWC and GLD/GDX are well-known textbook pairs, and the worked example was chosen after seeing results.
 - **Out of scope:** intraday data, distance or copula pairs methods, machine-learning selection, and transaction-level borrow data.
 
 ## 6. Reproduce in 3 commands

@@ -148,7 +148,10 @@ def simulate_pair(py: np.ndarray, px: np.ndarray, z: np.ndarray, beta: np.ndarra
             c = cost * exit_notional
             pnl[t] -= c
             trade["costs"] += c
-            trade.update(exit_date=dates[t], exit_z=z[t], days=t - trade["_t0"],
+            # exit_z = z on the decision day (comparable with the rule thresholds);
+            # exit_fill_z = z at the fill one day later.
+            trade.update(exit_date=dates[t], exit_z=z[t - cfg.execution_lag],
+                         exit_fill_z=z[t], days=t - trade["_t0"],
                          exit_notional=exit_notional,
                          reason=close_reason[t] or (END if t == n - 1 else EXIT))
             trade["net"] = trade["gross"] - trade["costs"] - trade["borrow"]
@@ -167,7 +170,7 @@ def simulate_pair(py: np.ndarray, px: np.ndarray, z: np.ndarray, beta: np.ndarra
             c = cost * (wy + wx)
             pnl[t] -= c
             trade = dict(entry_date=dates[t], entry_z=z[t - cfg.execution_lag],
-                         direction=d, gross=0.0, costs=c, borrow=0.0,
+                         entry_fill_z=z[t], direction=d, gross=0.0, costs=c, borrow=0.0,
                          notional=wy + wx, _t0=t)
     return PairPath(pd.DatetimeIndex(dates) if not isinstance(dates, pd.RangeIndex) else dates,
                     z, beta, held, pnl, trades)
@@ -178,8 +181,7 @@ def spread_adf_pvalue(pair: pd.Series, logp: pd.DataFrame) -> float:
 
     Because the coefficients are fixed (not re-estimated on this data) the
     ordinary ADF/MacKinnon distribution applies. Applied to the trading window
-    it measures out-of-sample breakdown; it is a diagnostic only and never
-    feeds back into trading decisions.
+    it is an out-of-sample diagnostic only and never feeds back into trading.
     """
     s = logp[pair.y].to_numpy() - pair.alpha - pair.beta * logp[pair.x].to_numpy()
     return float(adfuller(s, regression="c", autolag="aic", result_object=False)[1])
@@ -251,13 +253,17 @@ def run_backtest(prices: pd.DataFrame, cfg: StrategyConfig,
             for tr in path.trades:
                 trade_rows.append(dict(window_start=s, group=pair.group, y=pair.y, x=pair.x, **tr))
             n_stops = sum(tr["reason"] == STOP for tr in path.trades)
+            # Out-of-sample calibration of the *static* spread, in formation units:
+            # if the formation relationship held, this z would have sd close to 1.
+            z_static = ((trade_logp[pair.y] - pair.alpha - pair.beta * trade_logp[pair.x]).to_numpy()
+                        - pair.spread_mean) / pair.spread_std
             pair_rows.append(dict(
                 window_start=s, trade_start=tdates[0], group=pair.group, y=pair.y, x=pair.x,
                 beta=pair.beta, eg_pvalue=pair.eg_pvalue, half_life=pair.half_life,
                 oos_adf_p=spread_adf_pvalue(pair, trade_logp),
-                # Power benchmark: same test, same length, on the *end* of the
-                # formation window, where the pair is known to look cointegrated.
-                is_adf_p=spread_adf_pvalue(pair, form_logp.iloc[-len(trade_logp):]),
+                oos_z_sd=float(np.std(z_static, ddof=1)),
+                oos_frac_beyond_stop=float(np.mean(np.abs(z_static) >= cfg.stop_z)),
+                signal_z_ac1=float(pd.Series(z).autocorr(1)),
                 n_trades=len(path.trades),
                 n_stops=n_stops, net_pnl=float(path.pnl.sum())))
         port.loc[tdates] = window_pnl / len(sel)
@@ -265,6 +271,8 @@ def run_backtest(prices: pd.DataFrame, cfg: StrategyConfig,
     trades = pd.DataFrame(trade_rows)
     pairs = pd.DataFrame(pair_rows)
     if not pairs.empty:
-        pairs["oos_broken"] = pairs["oos_adf_p"] >= 0.05
-        pairs["is_broken"] = pairs["is_adf_p"] >= 0.05
+        # ADF rejects a unit root in the OOS spread. Failing to reject is NOT proof
+        # of a breakdown: 126 days give the test low power, and selection on the
+        # formation window biases the formation fit towards looking stationary.
+        pairs["oos_adf_reject"] = pairs["oos_adf_p"] < 0.05
     return BacktestResult(cfg, port, trades, pairs, pd.DataFrame(win_rows), paths, n_open)

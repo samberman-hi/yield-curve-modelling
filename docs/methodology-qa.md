@@ -11,9 +11,10 @@ NSS is linear in the four betas once τ1 and τ2 are fixed. So for each candidat
 - The cost is resolution: grid steps are about 10% in τ. The extra fit a continuous optimiser could find is far smaller than the LOO error differences between models.
 
 ### 2. NSS has the lowest RMSE. Isn't that just because it has more parameters?
-In sample, partly yes. That is why I report a leave-one-maturity-out (LOO) test: drop one maturity, refit, predict it.
-- On LOO, NSS still wins: 5.8bp, against 6.5bp for NS with free τ and 11.3bp for Diebold–Li NS. So the extra hump captures real structure, mostly at the 6M–5Y points.
-- The wide-τ-grid NSS shows what overfitting looks like. Its in-sample RMSE is lower (2.6bp), but its LOO error is higher (6.9bp), and 11% of days have exploding betas.
+In sample, partly yes. That is why I report a leave-one-maturity-out (LOO) test: drop one maturity, refit, predict it. Only interpolation is scored, so no day is counted where the held-out point is the shortest or longest observed maturity.
+- On LOO, NSS still wins: 5.0bp, against 6.2bp for NS with free τ and 10.9bp for Diebold–Li NS. So the extra hump captures real structure, mostly at the 6M–5Y points.
+- The wide-τ-grid NSS shows what overfitting looks like. Its in-sample RMSE is lower (2.6bp), but its LOO error is higher (5.8bp, and 18bp against 12bp at the 20Y), and 11% of days have exploding betas.
+- Caveat: even the main NSS has τ2 at its 10-year ceiling on 30% of days. The bound acts as a regulariser.
 
 ### 3. How do the NS parameters map to level, slope and curvature, and why does β0 correlate only 0.60 with the Diebold–Li level proxy?
 - β0 is the yield at infinite maturity (level).
@@ -51,9 +52,9 @@ The practical point: a PCA hedge estimated over a mixed sample would have had th
 Both are. They measure different things.
 - **AUC measures ranking.** Recession months received higher probabilities than non-recession months. The 95% block-bootstrap CI is 0.58–0.95, so it excludes 0.5.
 - **Brier measures calibrated probability accuracy.** Over 2022–24 the model assigned up to 78% to recessions that did not happen (22 months above 50%). Those large squared errors push the Brier score (0.086) above the base rate's (0.078).
-- Excluding origins after 2021, the Brier skill is +0.20. Even so, the Diebold–Mariano test cannot reject equal accuracy with the base rate in either window (p = 0.69 and 0.22).
+- **The right test for nested models.** The base rate is the probit with b = 0, so the models are nested, and the plain DM test is undersized. The Clark–West test adjusts for this and rejects "no information" (p = 0.038 for 10y–3m, 0.008 for 10y–2y). DM on the realised Brier losses cannot reject equal accuracy (p = 0.69).
 
-The honest summary: the spread carries real ranking information, but with only about six recessions it does not deliver statistically better probability forecasts.
+The honest summary: the spread carries statistically significant predictive information, but the probability forecasts it actually produced were not more accurate than the base rate. With only four out-of-sample recessions the results are also fragile: starting the evaluation in 1990-05 instead of 1988-08 moves the Brier skill from −0.11 to −0.24. The "pre-2022" Brier skill of +0.20 is a post-hoc diagnostic, not a test.
 
 ### 8. Why did the 2022–24 inversion not produce a recession (so far)?
 I can describe what happened but cannot identify the cause with this data.
@@ -89,6 +90,8 @@ On 99% of days, duration + convexity is within \$16 per \$10k DV01 of exact repr
 1. **Mean reversion lost money in every training configuration** (Sharpe between −0.24 and −0.53) and lost out of sample too (Sharpe −0.32, p = 0.09). Over weeks to months, 2s10s trends with the policy cycle rather than reverting.
 2. **The carry signal's strong training Sharpe (1.09) was mostly beta to a steep, falling-rate curve.** The always-steepener had a 1.17 Sharpe over the same period. Out of sample, carry has a small gross edge (Sharpe 0.21, not significant), and its turnover (17 trades a year) means costs of 0.25–0.5bp/leg erase it.
 
+**A post-hoc follow-up, stated as such.** Because mean reversion failed in sample, the obvious alternative is trend. Selected on the same training grid, the trend rule (W=504, |z|>2) earns a test Sharpe of 0.41 (p = 0.027), and 15 of 16 variants are positive out of sample. I had already seen the test period when I formed this idea, so I present it as a hypothesis to check on future data, not a result.
+
 A clean negative result, with the reason understood, is more credible than a backtest with a Sharpe of 2.
 
 ---
@@ -98,14 +101,14 @@ A clean negative result, with the reason understood, is more credible than a bac
 | Topic | Number |
 |---|---|
 | Sample | 2001-07-31 → 2026-10-21, 6,308 days, 11 maturities (30Y masked 994 days) |
-| NSS fit | 3.2bp mean RMSE in sample; 5.8bp LOO out of sample |
+| NSS fit | 3.2bp mean RMSE in sample; 5.0bp LOO out of sample |
 | NS fit | 5.6bp (free τ) / 10.4bp (Diebold–Li fixed τ = 1.37y) RMSE |
 | PCA | PC1 78.0%, PC2 12.6%, PC3 5.3% → **95.9%**; OOS 95.5% |
 | ZLB instability | PC2 / PC3 congruence 0.52 / 0.24 in 2008–15 |
 | Probit (in-sample, 10y–3m) | b = −0.43, HAC p = 0.006 |
-| OOS recession | AUC **0.76** (10y–3m), 0.70 (10y–2y); Brier skill −0.11 (+0.20 pre-2022) |
+| OOS recession | AUC **0.76** (10y–3m), 0.70 (10y–2y); Clark–West p 0.038 / 0.008; Brier skill −0.11 |
 | 2022–24 | 25 months inverted, min −1.73pp; peak OOS probability 78% (May 2023) |
 | Latest | P(recession by Sep 2027) = 8.9% (10y–3m) |
 | DV01 | \$188.5 (2y) and \$774.7 (10y) per \$1mm; hedge ratio 0.24 |
-| Trades (OOS net Sharpe) | mean reversion −0.32, carry −0.14, always-steepener 0.00 |
+| Trades (OOS net Sharpe) | mean reversion −0.32, carry −0.14, always-steepener 0.00; post-hoc trend 0.41 |
 | Costs | 0.5bp/leg base case; carry's gross Sharpe 0.21 gone above 0.25bp |

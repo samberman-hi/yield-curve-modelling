@@ -92,3 +92,16 @@ def test_empirical_factors_hand_row():
     assert f["level"] == pytest.approx(7 / 3)
     assert f["slope"] == pytest.approx(3.0)
     assert f["curvature"] == pytest.approx(-1.0)
+
+
+def test_leave_one_out_scores_only_interpolation():
+    """LOO error is NaN on days where the held-out maturity is the longest one observed."""
+    from src.curves import leave_one_out_errors
+    mats = [0.25, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0]
+    row = curve(np.array(mats), np.array([4.0, -1.0, 1.0]), TAU_GRID[10])
+    y = pd.DataFrame([row, row], columns=[f"m{m}" for m in mats])
+    y.iloc[1, -1] = np.nan  # 30Y missing on day 2 -> 20Y would be extrapolation
+    err = leave_one_out_errors(y, mats, "NS")
+    assert np.isfinite(err.loc[0, "m20.0"]) and abs(err.loc[0, "m20.0"]) < 1e-6
+    assert np.isnan(err.loc[1, "m20.0"])
+    assert np.isfinite(err.loc[1, "m10.0"])

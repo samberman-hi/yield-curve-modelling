@@ -3,10 +3,11 @@
 **Sam Berman, University College Dublin**
 
 **Headline result.** The sample is 6,308 trading days of FRED Treasury yields, from July 2001 to October 2026.
-- A daily Nelson–Siegel–Svensson (NSS) model fits the 11-point curve with a mean error of **3.2bp**. When one maturity is held out and predicted from the others, the error is **5.8bp**.
+- A daily Nelson–Siegel–Svensson (NSS) model fits the 11-point curve with a mean error of **3.2bp**. When one maturity is held out and predicted from the others, the error is **5.0bp**.
 - **Three principal components explain 95.9%** of daily yield changes. Loadings estimated on 2001–13 still explain 95.5% of 2014–26 changes.
-- A 10y–3m probit model predicts recessions 12 months ahead out of sample with **AUC 0.76**, which beats chance. Its probability forecasts are not better than the historical base rate (Brier skill **−0.11**). The reason is the 2022–24 inversion: the model put recession odds at up to **78%**, and no recession has followed so far.
-- Two DV01-neutral 2s10s trades were tested out of sample: slope mean reversion and carry & roll-down. **Neither makes money after transaction costs** (net Sharpe −0.32 and −0.14).
+- A 10y–3m probit model predicts recessions 12 months ahead out of sample with **AUC 0.76**, which beats chance. A Clark–West test confirms the spread carries real predictive information (p = 0.04).
+- Its probability forecasts are still no more accurate than the historical base rate (Brier skill **−0.11**). The reason is the 2022–24 inversion: the model put recession odds at up to **78%**, and no recession has followed so far.
+- Two DV01-neutral 2s10s trades were tested out of sample: slope mean reversion and carry & roll-down. **Neither makes money after transaction costs** (net Sharpe −0.32 and −0.14). A trend rule, tested only after seeing those results, did better and is flagged as a hypothesis, not a finding.
 
 ---
 
@@ -80,6 +81,8 @@ What the parameters mean:
 
 **Out-of-sample check.** For each interior maturity, I drop it, refit the curve on the remaining maturities, and predict the dropped yield. This is leave-one-maturity-out (LOO). A model that overfits shows a low in-sample RMSE but a high LOO error.
 
+Only interpolation is scored. A day counts only if some maturity is observed both above and below the held-out one. For example, the 20Y is not scored while the 30Y is missing in 2002–06, because predicting it then would be extrapolation from the 10Y.
+
 ### 3.2 PCA of daily yield changes
 I compute daily changes $\Delta y_t$ in bp (3M–20Y, 9 maturities, 6,307 days) and their sample covariance matrix $\Sigma$. Then I take the eigen-decomposition $\Sigma=V\Lambda V'$. The share of variance explained by component $k$ is $\lambda_k/\sum_j\lambda_j$. All maturities are in bp, so I use the covariance matrix, not the correlation matrix.
 - **Sign conventions:** PC1 loadings sum to a positive number; on PC2 the long end loads above the short end; on PC3 the belly loads above the wings.
@@ -102,6 +105,7 @@ Here $s_t$ is the monthly average of the daily 10y–3m (or 10y–2y) spread.
 - **Brier score** $\frac1T\sum(p_t-y_t)^2$.
 - **Brier skill score** against the expanding historical base rate.
 - **Diebold–Mariano test** of equal Brier loss, using Newey–West variance with 12 lags and a Bartlett kernel.
+- **Clark–West (2007) test.** The base rate is the probit with $b=0$, so the two models are *nested*. With nested models the DM test is undersized (Clark–McCracken). Clark–West corrects the larger model's loss for parameter-estimation noise and tests, one-sided, whether the spread adds predictive information.
 
 ### 3.4 DV01-neutral 2s10s trades
 CMT yields are par yields, so each leg is treated as a par bond with a semi-annual coupon equal to its yield.
@@ -150,18 +154,19 @@ All tables are written by the pipeline to [`results/`](results/). Headline numbe
 
 *An animated version, month-end curves 2001–2026, is in [`figures/curve_animation.gif`](figures/curve_animation.gif).*
 
-| Model | Free params / day | Mean RMSE (bp) | 95th pct RMSE (bp) | **LOO MAE (bp)** | Days with \|β\|>20pp | Median \|Δb2\| per day (bp) |
-|---|---|---|---|---|---|---|
-| NS, fixed τ (Diebold–Li) | 3 | 10.4 | 20.4 | 11.3 | 0% | 8.1 |
-| NS, τ estimated | 4 | 5.6 | 11.1 | 6.5 | 0% | 9.1 |
-| **NSS** | 6 | **3.2** | 6.8 | **5.8** | 0.03% | 16.3 |
-| NSS, wide τ grid (0.1–30y) | 6 | 2.6 | 5.5 | 6.9 | **11.3%** | 20.3 |
+| Model | Free params / day | Mean RMSE (bp) | 95th pct RMSE (bp) | **LOO MAE (bp)** | Days with \|β\|>20pp | Days τ1 / τ2 at a bound | Median \|Δb2\| per day (bp) |
+|---|---|---|---|---|---|---|---|
+| NS, fixed τ (Diebold–Li) | 3 | 10.4 | 20.4 | 10.9 | 0% | — | 8.1 |
+| NS, τ estimated | 4 | 5.6 | 11.1 | 6.2 | 0% | 9% / — | 9.1 |
+| **NSS** | 6 | **3.2** | 6.8 | **5.0** | 0.03% | 13% / 30% | 16.3 |
+| NSS, wide τ grid (0.1–30y) | 6 | 2.6 | 5.5 | 5.8 | **11.3%** | 3% / 7% | 20.3 |
 
 ![Fit errors](figures/fig03_fit_errors.png)
 
-- **NSS fits best both in and out of sample.** Its main gain over NS is at the short end and in the belly, where LOO error falls from 6–7bp to 3–4bp. The 20Y is the hardest point for every model (LOO error 15–19bp). On 35% of days since 2006 the 20Y yield has been *above* the 30Y. That hump at the long end is something these smooth functional forms cannot capture.
+- **NSS fits best both in and out of sample.** Its main gain over NS is at the short end and in the belly, where LOO error falls from 6–7bp to 3–4bp. The 20Y is the hardest point for every model (LOO error 12–16bp). On a third of days since 2006 the 20Y yield has been *above* the 30Y. That hump at the long end is something these smooth functional forms cannot capture.
 - **Fit quality depends on the regime.** NSS errors were about 1.5bp in the quiet ZLB years (2010–2021) and 6.5bp in 2008 and 2022. In those years the front end moved sharply and the curve took on shapes these functional forms struggle with.
-- **The wide grid shows how NSS overfits.** It lowers in-sample RMSE (2.6bp against 3.2bp) but raises LOO error (6.9bp against 5.8bp). On 11% of days the betas explode in offsetting pairs, because $\beta_0$ becomes unidentified when $\tau$ is beyond the longest maturity.
+- **The wide grid shows how NSS overfits.** It lowers in-sample RMSE (2.6bp against 3.2bp) but raises LOO error (5.8bp against 5.0bp), and is much worse at the 20Y (18bp against 12bp). On 11% of days the betas explode in offsetting pairs, because $\beta_0$ becomes unidentified when $\tau$ is beyond the longest maturity.
+- **The constrained grid binds often.** In the main NSS, $\tau_2$ sits at its 10-year ceiling on 30% of days, and $\tau_1$ sits at a bound on 13%. The bounds are doing real work as a regulariser: relaxing them is exactly what produces the wide-grid instability.
 
 **Parameter stability.** The decay parameter jumps around when it is profiled daily. 9% of NS days sit at a grid edge. The NSS $\beta_2$ and $\beta_3$ change by a median of 16bp a day, twice as much as in the fixed-τ NS. This is the usual trade-off: **fixing τ costs accuracy but makes the betas interpretable, smooth time series.** That is why the Diebold–Li specification is the one used to map factors below.
 
@@ -228,22 +233,26 @@ So a hedge built on full-sample PCs would have been mis-specified at the ZLB.
 
 **Out of sample** (expanding window, 12-month publication lag; both spreads evaluated on the common window of origins 1988-08 to 2025-09, 446 months, 36 of them recession months):
 
-| Spread | AUC [95% block-bootstrap CI] | Brier | Brier (base rate) | Brier skill | DM p-value |
-|---|---|---|---|---|---|
-| **10y–3m** | **0.76** [0.58, 0.95] | 0.086 | 0.078 | −0.11 | 0.69 |
-| 10y–2y | 0.70 [0.49, 0.96] | 0.075 | 0.078 | +0.04 | 0.69 |
-| *10y–3m, origins to 2021-12* | *0.81* [0.63, 0.97] | 0.068 | 0.086 | *+0.20* | 0.22 |
-| *10y–2y, origins to 2021-12* | *0.75* [0.53, 0.99] | 0.073 | 0.085 | *+0.14* | 0.047 |
+| Spread | AUC [95% block-bootstrap CI] | Brier | Brier (base rate) | Brier skill | DM p-value | Clark–West p (1-sided) |
+|---|---|---|---|---|---|---|
+| **10y–3m** | **0.76** [0.58, 0.95] | 0.086 | 0.078 | −0.11 | 0.69 | **0.038** |
+| 10y–2y | 0.70 [0.49, 0.96] | 0.075 | 0.078 | +0.04 | 0.69 | **0.008** |
+| *Sensitivity: 10y–3m, origins from 1990-05* | 0.73 [0.53, 0.96] | 0.080 | 0.064 | −0.24 | 0.44 | 0.084 |
+| *Post-hoc: 10y–3m, origins to 2021-12* | *0.81* [0.63, 0.97] | 0.068 | 0.086 | *+0.20* | 0.22 | 0.014 |
+| *Post-hoc: 10y–2y, origins to 2021-12* | *0.75* [0.53, 0.99] | 0.073 | 0.085 | *+0.14* | 0.047 | 0.001 |
+
+*The "origins to 2021-12" rows were added after seeing the 2022–24 false alarm. They are diagnostic only, not a test. A 21-month publication lag (the longest NBER trough announcement) changes AUC and Brier skill by less than 0.01.*
 
 ![Recession probabilities](figures/fig08_recession_probabilities.png)
 
-- **Ranking (AUC).** The 10y–3m spread ranks recession months above non-recession months out of sample, with AUC 0.76. Its CI excludes 0.5. The 10y–2y does worse (0.70) and its CI includes 0.5, which matches Estrella–Mishkin's finding that the 3-month bill is the better short leg. Out-of-sample probabilities rose ahead of the 1990, 2001 and 2008 recessions. Covid (2020) was not a curve-driven recession, and the 2019 inversion only coincidentally preceded it.
-- **Calibration (Brier).** The models do *not* beat the naive base rate over the full window, and the Diebold–Mariano tests cannot reject equal accuracy (p ≈ 0.69). The full-sample 10y–3m slope is significant in sample (p = 0.006), but that does not turn into significantly better probability forecasts out of sample.
+- **Ranking (AUC).** The 10y–3m spread ranks recession months above non-recession months out of sample, with AUC 0.76. Its CI excludes 0.5. The 10y–2y AUC is lower (0.70) and its CI includes 0.5. That ordering matches Estrella–Mishkin's finding that the 3-month bill is the better short leg, although here the difference is not statistically significant. Out-of-sample probabilities rose ahead of the 1990, 2001 and 2008 recessions. Covid (2020) was not a curve-driven recession, and the 2019 inversion only coincidentally preceded it.
+- **Information versus accuracy.** The Clark–West test is the right test for nested models, and it rejects "no predictive information" for both spreads (p = 0.038 and 0.008). The forecasts actually produced, however, do *not* beat the base rate on Brier score, and DM cannot reject equal accuracy (p ≈ 0.69). In plain terms, the spread contains real information, but the probabilities it produced were too noisy and too confident to be more accurate in a sample with only four out-of-sample recessions.
+- **Start-date sensitivity.** Starting evaluation in 1990-05 drops the 1990–91 recession from the test and lowers Brier skill to −0.24, which shows how fragile statistics built on four episodes are. There is also no evidence that 10y–3m beats 10y–2y: their AUC confidence intervals overlap almost completely.
 
 **The 2022–24 inversion.**
 - The 10y–3m monthly spread was negative continuously for **25 months (2022-11 to 2024-11)**, reaching **−1.73pp**. It then dipped marginally below zero again for a few months in 2025. That is the longest and deepest inversion in the sample since 1981.
 - The out-of-sample 10y–3m probit gave probabilities above 50% for 22 origin months, peaking at **78% in May 2023**. That forecast was for May 2024. No NBER recession has been declared through the latest USREC observation (2026-09).
-- This one episode is what turns the 10y–3m Brier skill from +0.20 (origins up to 2021) to −0.11. Over the full window, at the 50% threshold, the model made 26 false-alarm months against 7 correct ones.
+- This one episode is what turns the 10y–3m Brier skill from +0.20 (in the post-hoc window of origins up to 2021) to −0.11. Over the full window, at the 50% threshold, the model made 26 false-alarm months against 7 correct ones.
 - As the false alarm enters the training window, the estimated slope coefficient flattens from −0.76 (at the May 2023 origin) to −0.45 (latest). That is the expanding window "learning" that inversions have become less reliable.
 - Plausible reasons, which I cannot test separately here:
   - a term premium that was compressed by QE, so an inverted curve now signals less;
@@ -274,8 +283,9 @@ Out-of-sample Sharpe at different cost levels:
 
 ![Curve trades](figures/fig10_curve_trades.png)
 
-- **Mean reversion fails in and out of sample.** Every one of the 16 parameter pairs had a *negative* training Sharpe, between −0.24 and −0.53. Grid selection could only pick the least bad. Over horizons of weeks to months the 2s10s spread trends with the policy cycle rather than reverting. The mirror-image trend rule, checked *after* seeing the results and so not a valid test, earns a Sharpe of only 0.07 out of sample (p = 0.72).
-- **Carry & roll-down earned a 1.09 Sharpe in training (1981–2001), but almost all of that came from always being a steepener.** Over 1981–2001 the always-steepener earned \$789k a year, mostly from carry (\$268k) and roll-down (\$431k) in a steep, falling-rate curve. Out of sample, the carry signal has a small gross edge (Sharpe 0.21, not significant). It flips about 17 times a year, so costs above 0.25bp/leg wipe that edge out.
+- **Mean reversion fails in sample, and the out-of-sample test only confirms it.** Every one of the 16 parameter pairs had a *negative* training Sharpe, between −0.24 and −0.53, so "selection" could only pick the least bad. The evidence against mean reversion was already there before the test period: over horizons of weeks to months the 2s10s spread trends with the policy cycle rather than reverting.
+- **Post-hoc hypothesis: trend following.** After seeing this, I ran the mirror-image rule (trade *with* the z-score) on the same grid and selected parameters on training data only. The pick, W=504 days and |z|>2, had a training Sharpe of 0.43. It earned a **test Sharpe of 0.41** (+\$234k a year, NW p = 0.027), and 15 of the 16 variants were positive out of sample. The test period had already been seen when this rule was formed, so this is **a hypothesis for future data, not a validated result**. The full grid is in [`results/trades_posthoc_trend_grid.csv`](results/trades_posthoc_trend_grid.csv).
+- **Carry & roll-down earned a 1.09 Sharpe in training (1981–2001), but almost all of that came from always being a steepener.** It was long the steepener 87% of the time, and the plain always-steepener earned a Sharpe of 1.17 over the same period. Over 1981–2001 the always-steepener earned \$789k a year, mostly from carry (\$268k) and roll-down (\$431k) in a steep, falling-rate curve. Out of sample, the carry signal has a small gross edge (Sharpe 0.21, not significant). It flips about 17 times a year, so costs above 0.25bp/leg wipe that edge out.
 - **Attribution of the always-steepener, 2001–26 (per year):**
   - roll-down +\$74k
   - carry −\$3k (the 2y yields little more than the 3M funding rate)
@@ -290,8 +300,9 @@ Out-of-sample Sharpe at different cost levels:
 
 - **The yields are CMT par yields, not tradable bonds.** P&L treats each maturity as a constant-maturity par bond re-struck daily. It ignores on-the-run/off-the-run spreads, repo specialness, coupon effects and the futures basis. Funding is proxied by the 3M CMT, not GC repo. DV01 re-hedging costs are ignored.
 - **Roll-down uses linear interpolation between CMT nodes.** A fitted curve would give slightly different numbers.
+- **There is no execution lag.** Trades fill at the close that generates the signal. With a one-day lag, out-of-sample Sharpes become −0.39 (mean reversion) and −0.29 (carry), so the conclusions do not change. The carry rule has no hysteresis; an exit band would cut turnover but was not tested, to avoid another post-hoc choice.
 - **Transaction costs are a single assumed number**, with sensitivity reported. Market impact for \$50mm+ clips in stressed markets would be larger.
-- **The recession models rest on few events.** There are only 5–6 recessions in the estimation samples (36 recession months out of sample), so every out-of-sample statistic has wide confidence intervals: for example, the AUC CI spans 0.58–0.95.
+- **The recession models rest on few events.** There are only 5–6 recessions in the estimation samples, and four in the test window (36 recession months), so every out-of-sample statistic has wide confidence intervals: for example, the AUC CI spans 0.58–0.95. In 1988–91 the expanding window had only three positive training labels.
 - **The 12-month publication lag is an approximation.** NBER lags vary from 4 to 21 months. The latest USREC zeros are provisional.
 - **The probit uses only the spread.** It deliberately excludes the level of rates, credit spreads and the term premium, so it tests the classic one-variable model, not the best possible model.
 - **NS/NSS results depend on the τ grid.** That choice is a modelling decision, shown here with a wide-grid robustness check. The NSS ordering constraint $\tau_2\ge2\tau_1$ is a convention for identification, not a theory.
@@ -303,7 +314,7 @@ Out-of-sample Sharpe at different cost levels:
 ```bash
 pip install -r requirements.txt   # Python 3.13; pinned versions
 python -m src.pipeline            # downloads FRED data (cached in data/raw/), writes figures/ and results/  (~2 min)
-pytest                            # 46 offline tests of the core calculations
+pytest                            # 48 offline tests of the core calculations
 ```
 
 To re-execute the notebook with outputs:

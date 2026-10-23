@@ -18,14 +18,50 @@
     "USREC": "FRED (cached)"
   },
   "rmse_mean_bp[NS (fixed tau)]": 10.39,
-  "loo_mae_bp[NS (fixed tau)]": 11.28,
+  "loo_mae_bp[NS (fixed tau)]": 10.9,
   "rmse_mean_bp[NS]": 5.57,
-  "loo_mae_bp[NS]": 6.54,
+  "loo_mae_bp[NS]": 6.19,
   "rmse_mean_bp[NSS]": 3.16,
-  "loo_mae_bp[NSS]": 5.78,
+  "loo_mae_bp[NSS]": 4.99,
   "rmse_mean_bp[NSS wide]": 2.64,
-  "loo_mae_bp[NSS wide]": 6.9,
+  "loo_mae_bp[NSS wide]": 5.75,
   "blowup_pct[NSS wide]": 11.27,
+  "tau_edge_pct": {
+    "NS": {
+      "tau1": 9.0,
+      "tau2": NaN
+    },
+    "NSS": {
+      "tau1": 13.1,
+      "tau2": 29.6
+    },
+    "NSS (wide tau grid)": {
+      "tau1": 2.6,
+      "tau2": 7.3
+    }
+  },
+  "loo_mae_bp_by_maturity[NSS]": {
+    "3M": 3.48,
+    "6M": 4.28,
+    "1Y": 4.56,
+    "2Y": 3.07,
+    "3Y": 3.23,
+    "5Y": 2.79,
+    "7Y": 3.92,
+    "10Y": 7.73,
+    "20Y": 11.88
+  },
+  "loo_mae_bp_by_maturity[NS]": {
+    "3M": 3.76,
+    "6M": 6.72,
+    "1Y": 6.24,
+    "2Y": 4.46,
+    "3Y": 4.7,
+    "5Y": 5.0,
+    "7Y": 4.99,
+    "10Y": 7.6,
+    "20Y": 12.22
+  },
   "rmse_by_year_NSS": {
     "2001": 6.61,
     "2002": 3.27,
@@ -102,12 +138,27 @@
   "brier_base[10y-3m]": 0.0777,
   "bss[10y-3m]": -0.105,
   "dm_p[10y-3m]": 0.687,
+  "cw_p[10y-3m]": 0.038,
+  "bss_from_1990_05[10y-3m]": -0.241,
+  "auc_from_1990_05[10y-3m]": 0.727,
+  "pub_lag21[10y-3m]": {
+    "AUC": 0.759,
+    "BSS": -0.113,
+    "first origin": "1989-05"
+  },
   "auc_pre2022[10y-3m]": 0.807,
   "bss_pre2022[10y-3m]": 0.204,
   "peak_prob_2022_24[10y-3m]": 0.784,
   "peak_prob_origin[10y-3m]": "2023-05",
   "months_prob_gt50_2022_24[10y-3m]": 22,
   "latest_prob[10y-3m]": 0.089,
+  "oos_slope_b_at_peak[10y-3m]": -0.756,
+  "oos_slope_b_latest[10y-3m]": -0.451,
+  "signals_p_gt50[10y-3m]": {
+    "false alarms (months)": 26,
+    "hits (months)": 7,
+    "recession months": 36
+  },
   "latest_origin": "2026-09",
   "probit_b[10y-2y]": -0.756,
   "probit_p[10y-2y]": 0.0077,
@@ -120,20 +171,55 @@
   "brier_base[10y-2y]": 0.0779,
   "bss[10y-2y]": 0.04,
   "dm_p[10y-2y]": 0.692,
+  "cw_p[10y-2y]": 0.008,
+  "bss_from_1990_05[10y-2y]": 0.047,
+  "auc_from_1990_05[10y-2y]": 0.667,
+  "pub_lag21[10y-2y]": {
+    "AUC": 0.703,
+    "BSS": 0.038,
+    "first origin": "1988-08"
+  },
   "auc_pre2022[10y-2y]": 0.75,
   "bss_pre2022[10y-2y]": 0.144,
   "peak_prob_2022_24[10y-2y]": 0.523,
   "peak_prob_origin[10y-2y]": "2023-07",
   "months_prob_gt50_2022_24[10y-2y]": 2,
   "latest_prob[10y-2y]": 0.121,
-  "inversion_10y3m_months": 30,
-  "inversion_10y3m_first": "2022-11",
-  "inversion_10y3m_last": "2025-08",
+  "oos_slope_b_at_peak[10y-2y]": -0.888,
+  "oos_slope_b_latest[10y-2y]": -0.755,
+  "signals_p_gt50[10y-2y]": {
+    "false alarms (months)": 2,
+    "hits (months)": 0,
+    "recession months": 36
+  },
+  "inversion_10y3m_months_2022_25": 30,
+  "inversion_10y3m_longest_run": {
+    "months": 25,
+    "first": "2022-11",
+    "last": "2024-11"
+  },
   "inversion_10y3m_min_pp": -1.73,
+  "share_days_20y_above_30y": 0.335,
   "oos_common_start": "1988-08",
   "usrec_last": "2026-09",
-  "posthoc_trend_test_sharpe": 0.07,
-  "posthoc_trend_test_p": 0.723,
+  "test_sharpe_1day_exec_lag": {
+    "Slope mean reversion": -0.39,
+    "Carry & roll-down": -0.29,
+    "Always steepener": 0.0
+  },
+  "posthoc_trend": {
+    "window": 504,
+    "entry_z": 2.0,
+    "train_sharpe": 0.43,
+    "test_sharpe": 0.41,
+    "test_p": 0.027,
+    "test_ann_pnl_k": 234.0,
+    "test_sharpe_range_all_16": [
+      -0.11,
+      0.49
+    ]
+  },
+  "carry_train_time_long_steepener": 0.87,
   "attrib_train_$k": {
     "carry": 267.5,
     "rolldown": 430.5,

@@ -105,7 +105,11 @@ def section_curves(yields: pd.DataFrame, usrec: pd.Series):
         p = f.params
         betas = p[[c for c in p if c.startswith("b")]]
         grid = curves.WIDE_TAU_GRID if "wide" in name else curves.TAU_GRID
-        at_bound = ((p["tau1"] <= grid[0] * 1.001) | (p["tau1"] >= grid[-1] * 0.999)).mean()
+        # Edges of what the candidate list actually allows (for NSS, tau2 >= 2 tau1
+        # caps tau1 below the top of the grid).
+        t1_max = grid[grid * curves.NSS_MIN_TAU_RATIO <= grid[-1] * 1.001].max() if "NSS" in name else grid[-1]
+        at_bound = ((p["tau1"] <= grid[0] * 1.001) | (p["tau1"] >= t1_max * 0.999)).mean()
+        t2_bound = ((p["tau2"] >= grid[-1] * 0.999).mean()) if "NSS" in name else np.nan
         rows.append({
             "model": name,
             "params": betas.shape[1] + (0 if "fixed" in name else (2 if "NSS" in name else 1)),
@@ -118,6 +122,7 @@ def section_curves(yields: pd.DataFrame, usrec: pd.Series):
             "median |daily chg b2| (bp)": 100 * betas["b2"].diff().abs().median(),
             "% days |beta| > 20pp": 100 * (betas.abs() > 20).any(axis=1).mean(),
             "% days tau1 at grid edge": 100 * at_bound if "fixed" not in name else np.nan,
+            "% days tau2 at grid edge": 100 * t2_bound,
         })
     summary = _save_table(pd.DataFrame(rows).set_index("model"), "curve_fit_summary")
     loo_table = _save_table(pd.DataFrame({k: v.abs().mean() for k, v in loo.items()})
@@ -128,6 +133,11 @@ def section_curves(yields: pd.DataFrame, usrec: pd.Series):
     K["rmse_mean_bp[NSS wide]"] = _r(summary.loc["NSS (wide tau grid)", "mean RMSE (bp)"])
     K["loo_mae_bp[NSS wide]"] = _r(summary.loc["NSS (wide tau grid)", "LOO MAE (bp)"])
     K["blowup_pct[NSS wide]"] = _r(summary.loc["NSS (wide tau grid)", "% days |beta| > 20pp"])
+    K["tau_edge_pct"] = {m: {"tau1": _r(summary.loc[m, "% days tau1 at grid edge"], 1),
+                             "tau2": _r(summary.loc[m, "% days tau2 at grid edge"], 1)}
+                         for m in ["NS", "NSS", "NSS (wide tau grid)"]}
+    K["loo_mae_bp_by_maturity[NSS]"] = loo_table["NSS"].round(2).to_dict()
+    K["loo_mae_bp_by_maturity[NS]"] = loo_table["NS"].round(2).to_dict()
     K["rmse_by_year_NSS"] = fits["NSS"].rmse_bp.groupby(fits["NSS"].rmse_bp.index.year).mean().round(2).to_dict()
 
     # Factor mapping: NS betas vs model-free level/slope/curvature proxies.
@@ -374,10 +384,11 @@ def section_recession(yields_full: pd.DataFrame, usrec: pd.Series):
 
     fcs = {c: recession.expanding_probit(ms[c], usrec) for c in ms}
     common_start = max(f.prob.index[0] for f in fcs.values())
-    windows = {
-        "full OOS": (None, None),
+    windows = {  # the last three are sensitivity checks; the 2021-12 cut is post-hoc
         "common window": (common_start, None),
-        "common window, origins to 2021-12": (common_start, pd.Timestamp("2021-12-01")),
+        "own full OOS window": (None, None),
+        "origins from 1990-05": (pd.Timestamp("1990-05-01"), None),
+        "post-hoc: origins to 2021-12": (common_start, pd.Timestamp("2021-12-01")),
     }
     rows = []
     for c, fc in fcs.items():
@@ -400,7 +411,15 @@ def section_recession(yields_full: pd.DataFrame, usrec: pd.Series):
         K[f"brier_base[{c}]"] = _r(r["Brier (base rate)"], 4)
         K[f"bss[{c}]"] = _r(r["Brier skill score"], 3)
         K[f"dm_p[{c}]"] = _r(r["DM p-value"], 3)
-        r2 = oos.loc[(c, "common window, origins to 2021-12")]
+        K[f"cw_p[{c}]"] = _r(r["CW p-value (1-sided)"], 3)
+        K[f"bss_from_1990_05[{c}]"] = _r(oos.loc[(c, "origins from 1990-05"), "Brier skill score"], 3)
+        K[f"auc_from_1990_05[{c}]"] = _r(oos.loc[(c, "origins from 1990-05"), "AUC"], 3)
+        # Sensitivity: 21-month publication lag (the longest NBER trough announcement).
+        fc21 = recession.expanding_probit(ms[c], usrec, pub_lag=21, start=f"{common_start:%Y-%m}")
+        e21 = recession.evaluate(fc21)
+        K[f"pub_lag21[{c}]"] = {"AUC": _r(e21["AUC"], 3), "BSS": _r(e21["Brier skill score"], 3),
+                                "first origin": e21["first origin"]}
+        r2 = oos.loc[(c, "post-hoc: origins to 2021-12")]
         K[f"auc_pre2022[{c}]"] = _r(r2["AUC"], 3)
         K[f"bss_pre2022[{c}]"] = _r(r2["Brier skill score"], 3)
         p22 = fcs[c].prob.loc["2022-01":"2024-12"]
@@ -516,11 +535,29 @@ def section_trades(yields_full: pd.DataFrame):
     costs = _save_table(pd.DataFrame(cost_rows).pivot(index="cost (bp/leg)", columns="strategy",
                                                       values="Sharpe"), "trades_cost_sensitivity")
 
-    # Post-hoc only: the mirror image of the mean-reversion rule (trend following).
-    mr_name = list(positions)[0]
-    trend = trades.performance(trades.backtest(-positions[mr_name], pnl).loc[te])
-    K["posthoc_trend_test_sharpe"] = _r(trend.sharpe)
-    K["posthoc_trend_test_p"] = _r(trend.p_value, 3)
+    # Robustness: execute one day after the signal instead of at the signal close.
+    lag_rows = {name: trades.performance(trades.backtest(pos.shift(1).fillna(0.0), pnl).loc[te]).sharpe
+                for name, pos in positions.items()}
+    K["test_sharpe_1day_exec_lag"] = {k.split(" (")[0]: _r(v) for k, v in lag_rows.items()}
+
+    # POST-HOC (formed after seeing that mean reversion fails): trend following,
+    # i.e. the mirror image of the z-score rule, selected on the same training
+    # grid. The test period has already been looked at, so this is a hypothesis
+    # for future data, not a validated out-of-sample result.
+    (w_tr, k_tr), t_tab = trades.select_params(
+        lambda w, k: sharpe_train(-trades.zscore_signal(spread, int(w), k)), z_grid)
+    t_tab = t_tab.set_axis(["window", "entry z", "train Sharpe"], axis=1)
+    t_tab["test Sharpe"] = [trades.performance(trades.backtest(
+        -trades.zscore_signal(spread, int(w), k), pnl).loc[te]).sharpe for w, k in z_grid]
+    _save_table(t_tab, "trades_posthoc_trend_grid")
+    trend = trades.performance(trades.backtest(-trades.zscore_signal(spread, int(w_tr), k_tr), pnl).loc[te])
+    K["posthoc_trend"] = {"window": int(w_tr), "entry_z": k_tr,
+                          "train_sharpe": _r(t_tab["train Sharpe"].max()),
+                          "test_sharpe": _r(trend.sharpe), "test_p": _r(trend.p_value, 3),
+                          "test_ann_pnl_k": _r(trend.ann_pnl / 1e3, 0),
+                          "test_sharpe_range_all_16": [_r(t_tab["test Sharpe"].min()),
+                                                       _r(t_tab["test Sharpe"].max())]}
+    K["carry_train_time_long_steepener"] = _r((positions[list(positions)[1]].loc[tr] > 0).mean(), 3)
 
     attrib = _save_table((pnl.loc[te].mean() * trades.TRADING_DAYS / 1e3).to_frame(
         "always-steepener ann. $k (test)").T, "trades_pnl_attribution")

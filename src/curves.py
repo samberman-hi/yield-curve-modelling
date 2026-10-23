@@ -170,16 +170,21 @@ def leave_one_out_errors(yields: pd.DataFrame, mats: list[float], model: str = "
     """Out-of-sample check for the curve fit: drop one maturity, refit, predict it.
 
     Returns a DataFrame (days x held-out maturities) of prediction errors in bp.
-    Only interior maturities are held out by default, because extrapolating
-    beyond the shortest or longest observed point is a different exercise.
+    Only *interpolation* is scored: a day's error is NaN unless some maturity is
+    observed both below and above the held-out one on that day. (E.g. while the
+    30Y is missing in 2002-06, predicting the 20Y would be extrapolation from the
+    10Y, which is a different exercise.)
     """
     holdouts = holdouts or list(yields.columns[1:-1])
+    obs = yields.notna().to_numpy()
     out = {}
     for col in holdouts:
+        j = yields.columns.get_loc(col)
+        interior = obs[:, :j].any(axis=1) & obs[:, j + 1:].any(axis=1)
         y_train = yields.copy()
         y_train[col] = np.nan
         fit = fit_curves(y_train, mats, model=model, tau=tau, tau_grid=tau_grid)
-        out[col] = (yields[col] - fit.fitted[col]) * 100.0
+        out[col] = ((yields[col] - fit.fitted[col]) * 100.0).where(interior)
     return pd.DataFrame(out)
 
 

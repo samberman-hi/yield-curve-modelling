@@ -1,5 +1,5 @@
-model,params,mean RMSE (bp),median RMSE (bp),95th pct RMSE (bp),max RMSE (bp),LOO MAE (bp),median |daily chg b0| (bp),median |daily chg b2| (bp),% days |beta| > 20pp,% days tau1 at grid edge
-NS (fixed tau),3,10.393,9.493,20.438,48.704,11.283,3.561,8.14,0.0,
-NS,4,5.569,4.697,11.119,29.49,6.537,3.782,9.122,0.0,9.004
-NSS,6,3.162,2.833,6.812,14.707,5.776,5.274,16.287,0.032,7.055
-NSS (wide tau grid),6,2.637,2.372,5.546,12.406,6.898,10.62,20.308,11.271,2.473
+model,params,mean RMSE (bp),median RMSE (bp),95th pct RMSE (bp),max RMSE (bp),LOO MAE (bp),median |daily chg b0| (bp),median |daily chg b2| (bp),% days |beta| > 20pp,% days tau1 at grid edge,% days tau2 at grid edge
+NS (fixed tau),3,10.393,9.493,20.438,48.704,10.902,3.561,8.14,0.0,,
+NS,4,5.569,4.697,11.119,29.49,6.188,3.782,9.122,0.0,9.004,
+NSS,6,3.162,2.833,6.812,14.707,4.995,5.274,16.287,0.032,13.142,29.581
+NSS (wide tau grid),6,2.637,2.372,5.546,12.406,5.752,10.62,20.308,11.271,2.568,7.292

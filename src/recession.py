@@ -132,6 +132,22 @@ def diebold_mariano(loss_a: np.ndarray, loss_b: np.ndarray, lags: int = HORIZON)
     return float(stat), float(2 * (1 - stats.norm.cdf(abs(stat))))
 
 
+def clark_west(y: np.ndarray, p_small: np.ndarray, p_large: np.ndarray,
+               lags: int = HORIZON) -> tuple[float, float]:
+    """Clark–West (2007) test of equal accuracy for *nested* forecasts.
+
+    The base rate is the probit with b = 0, so the two models are nested and the
+    plain DM test is undersized (Clark & McCracken 2001). CW adjusts the larger
+    model's squared error for the noise from estimating the extra parameter:
+        f_t = (y - p_small)^2 - [(y - p_large)^2 - (p_small - p_large)^2]
+    and runs a one-sided HAC t-test of mean(f) > 0. Returns (stat, one-sided p).
+    """
+    y, ps, pl = (np.asarray(v, float) for v in (y, p_small, p_large))
+    f = (y - ps) ** 2 - ((y - pl) ** 2 - (ps - pl) ** 2)
+    stat, _ = diebold_mariano(f, np.zeros_like(f), lags)
+    return stat, float(1 - stats.norm.cdf(stat))
+
+
 def block_bootstrap_auc(p: np.ndarray, y: np.ndarray, block: int = 24, n_boot: int = 2000,
                         seed: int = 0) -> tuple[float, float]:
     """95% confidence interval for AUC from a moving-block bootstrap.
@@ -159,6 +175,7 @@ def evaluate(fc: OOSForecast) -> dict[str, float]:
     p, b, y = fc.prob[mask].to_numpy(), fc.base_rate[mask].to_numpy(), fc.target[mask].to_numpy()
     bs_model, bs_base = brier(p, y), brier(b, y)
     dm, dm_p = diebold_mariano((b - y) ** 2, (p - y) ** 2)
+    cw, cw_p = clark_west(y, b, p)
     lo, hi = block_bootstrap_auc(p, y)
     return {
         "first origin": fc.prob.index[0].strftime("%Y-%m"),
@@ -173,4 +190,6 @@ def evaluate(fc: OOSForecast) -> dict[str, float]:
         "Brier skill score": 1 - bs_model / bs_base,
         "DM stat": dm,
         "DM p-value": dm_p,
+        "CW stat": cw,
+        "CW p-value (1-sided)": cw_p,
     }

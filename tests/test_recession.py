@@ -108,3 +108,16 @@ def test_diebold_mariano_identical_losses():
     """Identical loss series give DM stat 0 and p-value 1 (not NaN)."""
     loss = np.random.default_rng(3).uniform(size=50)
     assert diebold_mariano(loss, loss) == (0.0, 1.0)
+
+
+def test_clark_west_rewards_informative_nested_model():
+    """Clark–West: a larger model that tracks the outcome beats a constant base rate (p < 0.01);
+    identical forecasts give stat 0 and one-sided p = 0.5."""
+    from src.recession import clark_west
+    rng = np.random.default_rng(4)
+    y = (rng.uniform(size=400) < 0.2).astype(float)
+    base = np.full(400, 0.2)
+    informative = np.clip(0.2 + 0.5 * (y - 0.2) + rng.normal(0, 0.05, 400), 0, 1)
+    stat, p = clark_west(y, base, informative, lags=0)
+    assert stat > 3 and p < 0.01
+    assert clark_west(y, base, base) == (0.0, 0.5)

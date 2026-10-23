@@ -1,0 +1,6 @@
+cost (bp/leg),Always steepener (benchmark),Carry & roll-down (threshold 5bp),"Slope mean reversion (W=63, z=2.0)"
+0.0,0.003,0.209,-0.193
+0.25,0.003,0.036,-0.255
+0.5,0.003,-0.137,-0.317
+1.0,0.003,-0.477,-0.44
+2.0,0.003,-1.119,-0.679

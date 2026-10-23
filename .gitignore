@@ -1,0 +1,10 @@
+# Downloaded data (re-created by src/data.py)
+data/raw/
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store

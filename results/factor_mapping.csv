@@ -1,0 +1,11 @@
+model,factor,NS parameter,corr (levels),corr (daily changes)
+NS (fixed tau),level,b0,0.602,0.698
+NS (fixed tau),level (20Y),b0,0.974,0.97
+NS (fixed tau),slope,-b1,0.996,0.929
+NS (fixed tau),curvature,b2,0.979,0.851
+NS (fixed tau),short rate (3M),b0+b1,0.997,0.789
+NS,level,b0,0.572,0.24
+NS,level (20Y),b0,0.914,0.367
+NS,slope,-b1,0.958,0.385
+NS,curvature,b2,0.636,0.206
+NS,short rate (3M),b0+b1,0.993,0.478

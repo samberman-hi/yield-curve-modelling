@@ -1,0 +1,13 @@
+strategy,period,P&L,ann. P&L ($k),ann. vol ($k),Sharpe,t-stat (NW),p-value,max drawdown ($k),hit rate,time in market,trades / yr
+"Slope mean reversion (W=63, z=2.0)",train,gross,-48.369,534.633,-0.09,-0.391,0.696,-2624.991,0.514,0.552,6.737
+"Slope mean reversion (W=63, z=2.0)",train,net,-129.414,538.582,-0.24,-1.052,0.293,-3304.991,0.511,0.552,6.737
+"Slope mean reversion (W=63, z=2.0)",test,gross,-98.025,507.797,-0.193,-1.01,0.312,-5385.905,0.519,0.618,6.312
+"Slope mean reversion (W=63, z=2.0)",test,net,-161.144,508.015,-0.317,-1.685,0.092,-6405.905,0.517,0.618,6.312
+Carry & roll-down (threshold 5bp),train,gross,747.28,644.949,1.159,5.202,0.0,-1268.57,0.565,0.894,4.356
+Carry & roll-down (threshold 5bp),train,net,703.718,645.153,1.091,4.902,0.0,-1278.57,0.564,0.894,4.356
+Carry & roll-down (threshold 5bp),test,gross,102.477,490.149,0.209,1.139,0.255,-3069.975,0.565,0.621,16.978
+Carry & roll-down (threshold 5bp),test,net,-67.307,491.756,-0.137,-0.75,0.453,-3951.631,0.558,0.621,16.978
+Always steepener (benchmark),train,gross,789.162,673.62,1.172,5.277,0.0,-1519.811,0.555,1.0,0.051
+Always steepener (benchmark),train,net,788.655,673.657,1.171,5.274,0.0,-1519.811,0.555,1.0,0.051
+Always steepener (benchmark),test,gross,2.058,620.192,0.003,0.018,0.986,-3502.972,0.49,1.0,0.0
+Always steepener (benchmark),test,net,2.058,620.192,0.003,0.018,0.986,-3502.972,0.49,1.0,0.0
